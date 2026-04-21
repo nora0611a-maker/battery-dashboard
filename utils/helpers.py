@@ -2,6 +2,13 @@ import pandas as pd
 import streamlit as st
 
 
+PCT_COL_CANDIDATES = {
+    "销量份额", "销售额份额", "销量市占率(%)", "销售额市占率(%)",
+    "新品成功率(%)", "销量增长率(%)", "销售额增长率(%)",
+    "mapping_rate", "映射率",
+}
+
+
 def show_empty(df: pd.DataFrame, msg: str = "暂无数据") -> bool:
     if df is None or df.empty:
         st.warning(msg)
@@ -11,7 +18,7 @@ def show_empty(df: pd.DataFrame, msg: str = "暂无数据") -> bool:
 
 def fmt_int(x):
     try:
-        return f"{int(x):,}"
+        return f"{int(float(x)):,}"
     except Exception:
         return ""
 
@@ -39,48 +46,40 @@ def add_download_button(df: pd.DataFrame, file_name: str, label: str):
 
 def prepare_share_table(
     df: pd.DataFrame,
-    rename_map: dict,
+    rename_map: dict[str, str] | None = None,
     percent_cols: list[str] | None = None,
 ) -> pd.DataFrame:
     if df is None or df.empty:
-        return df
+        return pd.DataFrame()
 
-    out = df.rename(columns=rename_map).copy()
-    percent_cols = percent_cols or []
+    out = df.copy()
+    if rename_map:
+        out = out.rename(columns=rename_map)
 
-    for col in percent_cols:
+    for col in (percent_cols or []):
         if col in out.columns:
             out[col] = pd.to_numeric(out[col], errors="coerce") * 100
 
     return out
 
 
-def make_brand_table_config(columns: list[str]) -> dict:
+def make_brand_table_config(cols: list[str]) -> dict:
     config = {}
+    text_cols = {"市场", "品牌", "型号段", "ASIN", "标题", "上架阶段", "新品状态", "最新月份", "上架月份", "原因"}
+    link_cols = {"链接", "商品链接", "详情页链接"}
 
-    text_cols = ["市场", "品牌", "型号段"]
-    for col in text_cols:
-        if col in columns:
+    for col in cols:
+        if col in text_cols:
             config[col] = st.column_config.TextColumn(col)
-
-    number_specs = {
-        "销量": ("%.0f", "center"),
-        "销售额": ("%.2f", "center"),
-        "市场总销量": ("%.0f", "center"),
-        "市场总销售额": ("%.2f", "center"),
-        "型号段总销量": ("%.0f", "center"),
-        "型号段总销售额": ("%.2f", "center"),
-        "销量份额": ("%.2f%%", "center"),
-        "销售额份额": ("%.2f%%", "center"),
-        "ASP": ("%.2f", "center"),
-    }
-
-    for col, (fmt, align) in number_specs.items():
-        if col in columns:
-            config[col] = st.column_config.NumberColumn(
-                col,
-                format=fmt,
-                alignment=align,
-            )
+        elif col in link_cols:
+            config[col] = st.column_config.LinkColumn(col, display_text="详情")
+        elif col in PCT_COL_CANDIDATES or "%" in col:
+            config[col] = st.column_config.NumberColumn(col, format="%.2f%%", alignment="center")
+        elif any(key in col for key in ["销售额", "ASP"]):
+            config[col] = st.column_config.NumberColumn(col, format="%.2f", alignment="center")
+        elif any(key in col for key in ["销量", "评分数", "新品数", "起量新品数"]):
+            config[col] = st.column_config.NumberColumn(col, format="%.0f", alignment="center")
+        elif col == "评分":
+            config[col] = st.column_config.NumberColumn(col, format="%.2f", alignment="center")
 
     return config

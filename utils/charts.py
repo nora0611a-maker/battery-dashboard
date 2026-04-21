@@ -1,7 +1,6 @@
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-from scipy.special import legendre_p
 
 
 def market_combo_chart(df: pd.DataFrame):

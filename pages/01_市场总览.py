@@ -20,7 +20,6 @@ df = df.copy()
 df["month_date"] = pd.to_datetime(df["month"].astype(str) + "-01", errors="coerce")
 df = df.sort_values("month_date")
 
-# ===== 时间范围筛选 =====
 min_date = df["month_date"].min().date()
 max_date = df["month_date"].max().date()
 
@@ -33,17 +32,15 @@ date_range = st.slider(
 )
 
 start_date, end_date = date_range
-
 work = df[
-    (df["month_date"].dt.date >= start_date) &
-    (df["month_date"].dt.date <= end_date)
+    (df["month_date"].dt.date >= start_date)
+    & (df["month_date"].dt.date <= end_date)
 ].copy()
 
 if work.empty:
     st.warning("当前筛选范围内暂无数据")
     st.stop()
 
-# ===== KPI =====
 total_units = work["units"].sum()
 total_revenue = work["revenue"].sum()
 avg_asp = total_revenue / total_units if total_units > 0 else 0
@@ -58,7 +55,6 @@ with c3:
 
 st.markdown("<div style='height: 22px;'></div>", unsafe_allow_html=True)
 
-# ===== 图表 =====
 section_header("月销量与销售额趋势")
 st.plotly_chart(market_combo_chart(work), use_container_width=True)
 
@@ -85,6 +81,5 @@ with c5:
         if rev_chg is not None:
             st.markdown(f"**销售额环比：** {rev_chg:+.1f}%")
 
-# ===== 解读 =====
 section_header("数据解读")
 insight_card(insight)

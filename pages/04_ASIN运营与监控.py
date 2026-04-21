@@ -24,6 +24,15 @@ def rename_for_display(df: pd.DataFrame, mapping: dict[str, str]) -> pd.DataFram
     return df.rename(columns=mapping).copy()
 
 
+def coerce_bool(series: pd.Series) -> pd.Series:
+    if series is None:
+        return pd.Series(dtype="boolean")
+    s = series.copy()
+    if str(s.dtype).lower() in {"bool", "boolean"}:
+        return s.fillna(False).astype(bool)
+    return s.astype(str).str.strip().str.lower().isin(["true", "1", "yes", "y"])
+
+
 def show_df(df: pd.DataFrame, show_cols: list[str]) -> None:
     show_cols = [c for c in show_cols if c in df.columns]
 
@@ -124,10 +133,28 @@ master_zh = rename_for_display(work, {
     "new_status": "新品状态",
 })
 
+numeric_cols = [
+    "累计销量",
+    "累计销售额",
+    "ASP",
+    "最新月销量",
+    "最新月销售额",
+    "销量增长率(%)",
+    "销售额增长率(%)",
+    "评分",
+    "评分数",
+]
+
+for col in numeric_cols:
+    if col in master_zh.columns:
+        master_zh[col] = pd.to_numeric(master_zh[col], errors="coerce")
+
 if "销量增长率(%)" in master_zh.columns:
     master_zh["销量增长率(%)"] = master_zh["销量增长率(%)"] * 100
 if "销售额增长率(%)" in master_zh.columns:
     master_zh["销售额增长率(%)"] = master_zh["销售额增长率(%)"] * 100
+if "是否新品" in master_zh.columns:
+    master_zh["是否新品"] = coerce_bool(master_zh["是否新品"])
 
 section_header("头部 ASIN", "优先看全市场和分型号段的头部 ASIN。")
 

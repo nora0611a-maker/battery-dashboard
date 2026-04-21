@@ -17,5 +17,8 @@ PAGE_TITLE = "Battery Market Dashboard"
 PAGE_ICON = "🔋"
 LAYOUT = "wide"
 
-# 填写 Google Sheet 文件 URL 中 /d/ 和 /edit 之间的那串 ID
+# Google Sheets 配置
+# 填写 Google Sheet 链接中 /d/ 与 /edit 之间的那段 ID
 GSHEET_ID = "1f0pSC9usNTrd1YZaBSoZm8z3hp3UDb3JJSfYiymGy5A"
+# 与同步脚本中的 GSHEET_TAB_PREFIX 保持一致
+GSHEET_TAB_PREFIX = "US_"
