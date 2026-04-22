@@ -67,21 +67,61 @@ def asp_line_chart(df: pd.DataFrame,):
 
 
 def segment_trend_chart(df: pd.DataFrame, value_col: str, title: str):
-    work = df.copy().sort_values(["segment", "month_key"])
+    work = df.copy()
+
+    if work.empty:
+        fig = px.line(title=title)
+        fig.update_layout(
+            margin=dict(l=20, r=20, t=10, b=20),
+            height=360,
+            legend_title_text="",
+            xaxis=dict(
+                title="月份",
+                type="date",
+                tickformat="%Y-%m",
+                dtick="M1",
+            ),
+        )
+        return fig
+
+    if "month_date" not in work.columns:
+        work["month_date"] = pd.to_datetime(
+            work["month"].astype(str) + "-01",
+            errors="coerce"
+        )
+
+    work = work[work["month_date"].notna()].copy()
+    work = work.sort_values(["segment", "month_date"])
+
+    month_count = work["month_date"].nunique()
+    show_markers = month_count <= 1
+
     fig = px.line(
         work,
-        x="month",
+        x="month_date",
         y=value_col,
         color="segment",
-        markers=False,
+        markers=show_markers,
         title=title,
     )
+
     fig.update_layout(
         margin=dict(l=20, r=20, t=10, b=20),
         height=360,
         legend_title_text="",
+        xaxis=dict(
+            title="月份",
+            type="date",
+            tickformat="%Y-%m",
+            dtick="M1",
+        ),
     )
+
     fig.update_traces(line=dict(width=2))
+
+    if show_markers:
+        fig.update_traces(marker=dict(size=9))
+
     return fig
 
 
@@ -101,10 +141,23 @@ def brand_share_chart(
             margin=dict(l=20, r=20, t=50, b=20),
             height=height,
             legend_title_text="",
+            xaxis=dict(
+                title="月份",
+                type="date",
+                tickformat="%Y-%m",
+                dtick="M1",
+            ),
         )
         return fig
 
-    # 按当前指标全周期累计值排序，取前 N 品牌
+    if "month_date" not in work.columns:
+        work["month_date"] = pd.to_datetime(
+            work["month"].astype(str) + "-01",
+            errors="coerce"
+        )
+
+    work = work[work["month_date"].notna()].copy()
+
     top_brands = (
         work.groupby("brand", as_index=False)[value_col]
         .sum()
@@ -114,28 +167,39 @@ def brand_share_chart(
     )
 
     work = work[work["brand"].isin(top_brands)].copy()
-    work = work.sort_values(["brand", "month_key"])
+    work = work.sort_values(["brand", "month_date"])
+
+    month_count = work["month_date"].nunique()
+    single_month = month_count <= 1
 
     fig = go.Figure()
 
     for brand in top_brands:
-        sub = work[work["brand"] == brand].sort_values("month_key").copy()
+        sub = work[work["brand"] == brand].sort_values("month_date").copy()
+        if sub.empty:
+            continue
 
         is_highlight = str(brand).strip().upper() == str(highlight_brand).strip().upper()
 
+        if single_month:
+            mode = "markers+text" if is_highlight else "markers"
+        else:
+            mode = "lines+markers+text" if is_highlight else "lines+markers"
+
         fig.add_trace(
             go.Scatter(
-                x=sub["month"],
+                x=sub["month_date"],
                 y=sub[value_col],
-                mode="lines+markers+text" if is_highlight else "lines",
+                mode=mode,
                 name=brand,
                 text=[f"{v:.1f}" if pd.notna(v) else "" for v in sub[value_col]] if is_highlight else None,
                 textposition="top center",
                 textfont=dict(size=11),
-                marker=dict(size=7) if is_highlight else None,
-                line=dict(width=3, shape="spline", smoothing=0.7) if is_highlight else dict(width=2, shape="spline",
-                                                                                            smoothing=0.7),
-                hovertemplate=f"{brand}<br>month=%{{x}}<br>{value_col}=%{{y:.2f}}<extra></extra>",
+                marker=dict(size=9 if single_month else 7),
+                line=dict(width=3, shape="spline", smoothing=0.7) if is_highlight else dict(
+                    width=2, shape="spline", smoothing=0.7
+                ),
+                hovertemplate=f"{brand}<br>month=%{{x|%Y-%m}}<br>{value_col}=%{{y:.2f}}<extra></extra>",
             )
         )
 
@@ -144,7 +208,12 @@ def brand_share_chart(
         margin=dict(l=20, r=20, t=50, b=20),
         height=height,
         legend_title_text="",
-        xaxis_title=None,
+        xaxis=dict(
+            title="月份",
+            type="date",
+            tickformat="%Y-%m",
+            dtick="M1",
+        ),
         yaxis_title=None,
         hovermode="x unified",
     )
