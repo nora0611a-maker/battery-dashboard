@@ -12,6 +12,9 @@
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[1]
+PROJECT_DIR = BASE_DIR.parent
+
+DATA_DIR = PROJECT_DIR / "MarketingData" / "outputFile" / "dashboard_v2_US"
 
 PAGE_TITLE = "Battery Market Dashboard"
 PAGE_ICON = "🔋"

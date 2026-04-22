@@ -7,7 +7,7 @@ from utils.styles import section_header, insight_card, kpi_card
 from utils.styles import apply_global_styles
 
 apply_global_styles()
-st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+# st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 
 trend_df = load_csv("agg_segment_month")
 insight = load_text("insight_segment")
@@ -20,28 +20,24 @@ work_all["month_date"] = pd.to_datetime(work_all["month"].astype(str) + "-01", e
 work_all["month_period"] = pd.to_datetime(work_all["month"].astype(str), format="%Y-%m", errors="coerce").dt.to_period("M")
 work_all = work_all.sort_values("month_date")
 
-month_options = sorted(work_all["month"].dropna().astype(str).unique().tolist())
+month_options = (
+    pd.to_datetime(work_all["month"].astype(str), format="%Y-%m", errors="coerce")
+    .dropna()
+    .dt.strftime("%Y-%m")
+    .drop_duplicates()
+    .sort_values()
+    .tolist()
+)
 
-title_col, filter_col = st.columns([1.4, 1.2], gap="medium")
-with title_col:
-    st.title("02 型号段结构")
-with filter_col:
-    st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
-    c_start, c_end = st.columns(2)
-    with c_start:
-        start_month = st.selectbox(
-            "开始月份",
-            month_options,
-            index=0,
-            key="segment_start_month",
-        )
-    with c_end:
-        end_month = st.selectbox(
-            "结束月份",
-            month_options,
-            index=len(month_options) - 1,
-            key="segment_end_month",
-        )
+st.title("02 型号段结构")
+
+st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
+
+c1, c2, c3 = st.columns(3)
+start_month = c1.selectbox("开始月份",month_options,index=0,key="segment_start_month")
+end_month = c2.selectbox("结束月份",month_options,index=len(month_options) - 1,key="segment_end_month")
+segment_options = ["全部"] + sorted([x for x in work_all["segment"].dropna().unique().tolist()])
+selected_segment = c3.selectbox("选择型号段", segment_options)
 
 start_period = pd.Period(start_month, freq="M")
 end_period = pd.Period(end_month, freq="M")
@@ -58,9 +54,6 @@ work_all = work_all[
 if work_all.empty:
     st.warning("当前筛选范围内暂无数据")
     st.stop()
-
-segment_options = ["全部"] + sorted([x for x in work_all["segment"].dropna().unique().tolist()])
-selected_segment = st.selectbox("选择型号段", segment_options)
 
 work = work_all.copy()
 if selected_segment != "全部":

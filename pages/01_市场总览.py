@@ -6,7 +6,7 @@ from utils.charts import market_combo_chart, asp_line_chart
 from utils.styles import section_header, kpi_card, insight_card, apply_global_styles
 
 apply_global_styles()
-st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+# st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 
 df = load_csv("agg_market_month")
 insight = load_text("insight_home")
@@ -19,7 +19,14 @@ df["month_date"] = pd.to_datetime(df["month"].astype(str) + "-01", errors="coerc
 df["month_period"] = pd.to_datetime(df["month"].astype(str), format="%Y-%m", errors="coerce").dt.to_period("M")
 df = df.sort_values("month_date")
 
-month_options = sorted(df["month"].dropna().astype(str).unique().tolist())
+month_options = (
+    pd.to_datetime(df["month"].astype(str), format="%Y-%m", errors="coerce")
+    .dropna()
+    .dt.strftime("%Y-%m")
+    .drop_duplicates()
+    .sort_values()
+    .tolist()
+)
 
 title_col, filter_col = st.columns([1.4, 1.2], gap="medium")
 with title_col:
@@ -70,7 +77,7 @@ with c2:
 with c3:
     kpi_card("ASP", fmt_money(avg_asp), "销售额 / 销量")
 
-st.markdown("<div style='height: 22px;'></div>", unsafe_allow_html=True)
+st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
 
 section_header("月销量与销售额趋势")
 st.plotly_chart(market_combo_chart(work), use_container_width=True)

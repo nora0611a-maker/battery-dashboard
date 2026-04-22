@@ -28,6 +28,8 @@ def market_combo_chart(df: pd.DataFrame):
         xaxis=dict(
             title="月份",
             type="date",
+            tickformat="%Y-%m",
+            dtick="M1",
         ),
         yaxis=dict(title="销量"),
         yaxis2=dict(title="销售额", overlaying="y", side="right"),
@@ -45,7 +47,7 @@ def market_combo_chart(df: pd.DataFrame):
     return fig
 
 
-def asp_line_chart(df: pd.DataFrame,):
+def asp_line_chart(df: pd.DataFrame):
     work = df.copy().sort_values("month_date")
 
     fig = px.line(
@@ -59,6 +61,8 @@ def asp_line_chart(df: pd.DataFrame,):
         xaxis=dict(
             title="月份",
             type="date",
+            tickformat="%Y-%m",
+            dtick="M1",
         ),
         margin=dict(l=20, r=20, t=0, b=20),
         height=360,
@@ -182,9 +186,11 @@ def brand_share_chart(
         is_highlight = str(brand).strip().upper() == str(highlight_brand).strip().upper()
 
         if single_month:
+            # 单月：所有品牌都显示点；只有高亮品牌显示标签
             mode = "markers+text" if is_highlight else "markers"
         else:
-            mode = "lines+markers+text" if is_highlight else "lines+markers"
+            # 多月：只有高亮品牌显示点和标签；其他品牌只显示线
+            mode = "lines+markers+text" if is_highlight else "lines"
 
         fig.add_trace(
             go.Scatter(
@@ -195,7 +201,7 @@ def brand_share_chart(
                 text=[f"{v:.1f}" if pd.notna(v) else "" for v in sub[value_col]] if is_highlight else None,
                 textposition="top center",
                 textfont=dict(size=11),
-                marker=dict(size=9 if single_month else 7),
+                marker=dict(size=9 if single_month else 7) if (single_month or is_highlight) else None,
                 line=dict(width=3, shape="spline", smoothing=0.7) if is_highlight else dict(
                     width=2, shape="spline", smoothing=0.7
                 ),

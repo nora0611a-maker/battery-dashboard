@@ -6,10 +6,9 @@ from utils.charts import brand_share_chart, bar_top_n
 from utils.styles import section_header, insight_card, kpi_card, kpi_card_wide, apply_global_styles
 
 apply_global_styles()
-st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 
 brand_month = load_csv("agg_brand_market_month")
-brand_segment = load_csv("agg_brand_segment_total")
+brand_segment_month = load_csv("agg_brand_segment_month")
 insight = load_text("insight_brand")
 
 if show_empty(brand_month, "agg_brand_market_month.csv 为空"):
@@ -17,31 +16,27 @@ if show_empty(brand_month, "agg_brand_market_month.csv 为空"):
 
 work_month_all = brand_month.copy()
 work_month_all["month_date"] = pd.to_datetime(work_month_all["month"].astype(str) + "-01", errors="coerce")
-work_month_all["month_period"] = pd.to_datetime(work_month_all["month"].astype(str), format="%Y-%m", errors="coerce").dt.to_period("M")
+work_month_all["month_period"] = pd.to_datetime(
+    work_month_all["month"].astype(str), format="%Y-%m", errors="coerce"
+).dt.to_period("M")
 work_month_all = work_month_all.sort_values("month_date")
 
-month_options = sorted(work_month_all["month"].dropna().astype(str).unique().tolist())
+month_options = (
+    pd.to_datetime(work_month_all["month"].astype(str), format="%Y-%m", errors="coerce")
+    .dropna()
+    .dt.strftime("%Y-%m")
+    .drop_duplicates()
+    .sort_values()
+    .tolist()
+)
 
-title_col, filter_col = st.columns([1.4, 1.2], gap="medium")
-with title_col:
-    st.title("03 品牌竞争")
-with filter_col:
-    st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
-    c_start, c_end = st.columns(2)
-    with c_start:
-        start_month = st.selectbox(
-            "开始月份",
-            month_options,
-            index=0,
-            key="brand_start_month",
-        )
-    with c_end:
-        end_month = st.selectbox(
-            "结束月份",
-            month_options,
-            index=len(month_options) - 1,
-            key="brand_end_month",
-        )
+st.title("03 品牌竞争")
+st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
+
+# ===== 先选时间 =====
+c1, c2, c3, c4 = st.columns(4)
+start_month = c1.selectbox("开始月份", month_options, index=0, key="brand_start_month")
+end_month = c2.selectbox("结束月份", month_options, index=len(month_options) - 1, key="brand_end_month")
 
 start_period = pd.Period(start_month, freq="M")
 end_period = pd.Period(end_month, freq="M")
@@ -59,6 +54,23 @@ if work_month_all.empty:
     st.warning("当前筛选范围内暂无数据")
     st.stop()
 
+# brand_segment_month 时间筛选
+if brand_segment_month is not None and not brand_segment_month.empty:
+    brand_segment_month = brand_segment_month.copy()
+    brand_segment_month["month_date"] = pd.to_datetime(
+        brand_segment_month["month"].astype(str) + "-01", errors="coerce"
+    )
+    brand_segment_month["month_period"] = pd.to_datetime(
+        brand_segment_month["month"].astype(str), format="%Y-%m", errors="coerce"
+    ).dt.to_period("M")
+    brand_segment_month = brand_segment_month[
+        (brand_segment_month["month_period"] >= start_period) &
+        (brand_segment_month["month_period"] <= end_period)
+    ].copy()
+else:
+    brand_segment_month = pd.DataFrame()
+
+# ===== 再基于筛选后的时间窗口做聚合 =====
 brand_total = (
     work_month_all.groupby(["market", "brand"], as_index=False)
     .agg(units=("units", "sum"), revenue=("revenue", "sum"))
@@ -77,15 +89,21 @@ brand_total["share_revenue_pct"] = brand_total["share_revenue"] * 100
 brand_total["asp"] = brand_total["revenue"] / brand_total["units"]
 
 brand_options = ["全部"] + sorted([x for x in brand_total["brand"].dropna().unique().tolist()])
+selected_brand = c3.selectbox("选择品牌", brand_options)
+
+# ===== 型号段联动：基于当前时间窗口 + 品牌现算 =====
+segment_base = brand_segment_month.copy()
+if selected_brand != "全部" and not segment_base.empty:
+    segment_base = segment_base[segment_base["brand"] == selected_brand].copy()
+
 segment_options = ["全部"] + (
-    sorted([x for x in brand_segment["segment"].dropna().unique().tolist()])
-    if not brand_segment.empty else []
+    sorted([x for x in segment_base["segment"].dropna().unique().tolist()])
+    if not segment_base.empty and "segment" in segment_base.columns else []
 )
 
-c1, c2 = st.columns(2)
-selected_brand = c1.selectbox("选择品牌", brand_options)
-selected_segment = c2.selectbox("选择型号段", segment_options)
+selected_segment = c4.selectbox("选择型号段", segment_options)
 
+# ===== 时间窗口后的数据 =====
 work_total = brand_total.copy()
 work_month = work_month_all.copy()
 
@@ -93,24 +111,38 @@ if selected_brand != "全部":
     work_total = work_total[work_total["brand"] == selected_brand].copy()
     work_month = work_month[work_month["brand"] == selected_brand].copy()
 
-if not brand_segment.empty:
-    work_segment = brand_segment.copy()
-else:
-    work_segment = brand_total.iloc[0:0].copy()
+# ===== 品牌 × 型号段：严格按当前时间窗口现算（基于 agg_brand_segment_month）=====
+work_segment = brand_segment_month.copy()
 
 if selected_brand != "全部" and not work_segment.empty:
     work_segment = work_segment[work_segment["brand"] == selected_brand].copy()
 if selected_segment != "全部" and not work_segment.empty:
     work_segment = work_segment[work_segment["segment"] == selected_segment].copy()
 
-top_brand = brand_total.sort_values("units", ascending=False).iloc[0]["brand"] if not brand_total.empty else "-"
-top_share = brand_total.sort_values("units", ascending=False).iloc[0]["share_units_pct"] if not brand_total.empty else 0
-top_asp_brand = brand_total.sort_values("asp", ascending=False).iloc[0]["brand"] if not brand_total.empty else "-"
-top_asp = brand_total.sort_values("asp", ascending=False).iloc[0]["asp"] if not brand_total.empty else 0
+if not work_segment.empty:
+    work_segment = (
+        work_segment.groupby(["market", "segment", "brand"], as_index=False)
+        .agg(
+            units=("units", "sum"),
+            revenue=("revenue", "sum"),
+            segment_units=("segment_units", "max"),
+            segment_revenue=("segment_revenue", "max"),
+        )
+    )
+    work_segment["share_units"] = work_segment["units"] / work_segment["segment_units"]
+    work_segment["share_revenue"] = work_segment["revenue"] / work_segment["segment_revenue"]
+    work_segment["share_units_pct"] = work_segment["share_units"] * 100
+    work_segment["share_revenue_pct"] = work_segment["share_revenue"] * 100
+    work_segment["asp"] = work_segment["revenue"] / work_segment["units"]
+
+top_brand = work_total.sort_values("units", ascending=False).iloc[0]["brand"] if not work_total.empty else "-"
+top_share = work_total.sort_values("units", ascending=False).iloc[0]["share_units_pct"] if not work_total.empty else 0
+top_asp_brand = work_total.sort_values("asp", ascending=False).iloc[0]["brand"] if not work_total.empty else "-"
+top_asp = work_total.sort_values("asp", ascending=False).iloc[0]["asp"] if not work_total.empty else 0
 
 c3, c4, c5 = st.columns([0.8, 1.1, 1.1])
 with c3:
-    kpi_card("品牌数量", f"{brand_total['brand'].nunique():,}", "当前筛选范围累计")
+    kpi_card("品牌数量", f"{work_total['brand'].nunique():,}", "当前筛选范围累计")
 with c4:
     kpi_card_wide("销量份额第一品牌", f"{top_brand} ｜ {top_share:.2f}%", "当前筛选范围累计")
 with c5:
@@ -195,7 +227,7 @@ with c8:
 
 with c9:
     st.plotly_chart(
-        bar_top_n(brand_total, "brand", "asp", "品牌 ASP 对比", n=10, horizontal=True, height=500),
+        bar_top_n(work_total, "brand", "asp", "品牌 ASP 对比", n=10, horizontal=True, height=500),
         use_container_width=True,
     )
 
