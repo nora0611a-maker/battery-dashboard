@@ -6,8 +6,6 @@ from utils.charts import brand_share_chart, bar_top_n
 from utils.styles import section_header, insight_card, kpi_card, kpi_card_wide, apply_global_styles
 
 apply_global_styles()
-
-st.title("03 品牌竞争")
 st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 
 brand_month = load_csv("agg_brand_market_month")
@@ -19,24 +17,42 @@ if show_empty(brand_month, "agg_brand_market_month.csv 为空"):
 
 work_month_all = brand_month.copy()
 work_month_all["month_date"] = pd.to_datetime(work_month_all["month"].astype(str) + "-01", errors="coerce")
+work_month_all["month_period"] = pd.to_datetime(work_month_all["month"].astype(str), format="%Y-%m", errors="coerce").dt.to_period("M")
 work_month_all = work_month_all.sort_values("month_date")
 
-min_date = work_month_all["month_date"].min().date()
-max_date = work_month_all["month_date"].max().date()
+month_options = sorted(work_month_all["month"].dropna().astype(str).unique().tolist())
 
-date_range = st.slider(
-    "选择时间范围",
-    min_value=min_date,
-    max_value=max_date,
-    value=(min_date, max_date),
-    format="YYYY-MM",
-)
+title_col, filter_col = st.columns([1.4, 1.2], gap="medium")
+with title_col:
+    st.title("03 品牌竞争")
+with filter_col:
+    st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
+    c_start, c_end = st.columns(2)
+    with c_start:
+        start_month = st.selectbox(
+            "开始月份",
+            month_options,
+            index=0,
+            key="brand_start_month",
+        )
+    with c_end:
+        end_month = st.selectbox(
+            "结束月份",
+            month_options,
+            index=len(month_options) - 1,
+            key="brand_end_month",
+        )
 
-start_date, end_date = date_range
+start_period = pd.Period(start_month, freq="M")
+end_period = pd.Period(end_month, freq="M")
+
+if start_period > end_period:
+    st.warning("开始月份不能晚于结束月份")
+    st.stop()
 
 work_month_all = work_month_all[
-    (work_month_all["month_date"].dt.date >= start_date) &
-    (work_month_all["month_date"].dt.date <= end_date)
+    (work_month_all["month_period"] >= start_period) &
+    (work_month_all["month_period"] <= end_period)
 ].copy()
 
 if work_month_all.empty:
@@ -125,8 +141,6 @@ brand_total_show_cols = [c for c in brand_total_show_cols if c in brand_total_zh
 
 if "销量份额" in brand_total_zh.columns:
     brand_total_zh = brand_total_zh.sort_values("销量份额", ascending=False).reset_index(drop=True)
-elif "销量市占率(%)" in brand_total_zh.columns:
-    brand_total_zh = brand_total_zh.sort_values("销量市占率(%)", ascending=False).reset_index(drop=True)
 
 st.dataframe(
     brand_total_zh[brand_total_show_cols],

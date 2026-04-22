@@ -8,8 +8,6 @@ from utils.styles import section_header, kpi_card, insight_card, apply_global_st
 apply_global_styles()
 st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 
-st.title("01 市场总览")
-
 df = load_csv("agg_market_month")
 insight = load_text("insight_home")
 
@@ -18,23 +16,42 @@ if show_empty(df, "agg_market_month.csv 为空"):
 
 df = df.copy()
 df["month_date"] = pd.to_datetime(df["month"].astype(str) + "-01", errors="coerce")
+df["month_period"] = pd.to_datetime(df["month"].astype(str), format="%Y-%m", errors="coerce").dt.to_period("M")
 df = df.sort_values("month_date")
 
-min_date = df["month_date"].min().date()
-max_date = df["month_date"].max().date()
+month_options = sorted(df["month"].dropna().astype(str).unique().tolist())
 
-date_range = st.slider(
-    "选择时间范围",
-    min_value=min_date,
-    max_value=max_date,
-    value=(min_date, max_date),
-    format="YYYY-MM",
-)
+title_col, filter_col = st.columns([1.4, 1.2], gap="medium")
+with title_col:
+    st.title("01 市场总览")
+with filter_col:
+    st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
+    c_start, c_end = st.columns(2)
+    with c_start:
+        start_month = st.selectbox(
+            "开始月份",
+            month_options,
+            index=0,
+            key="home_start_month",
+        )
+    with c_end:
+        end_month = st.selectbox(
+            "结束月份",
+            month_options,
+            index=len(month_options) - 1,
+            key="home_end_month",
+        )
 
-start_date, end_date = date_range
+start_period = pd.Period(start_month, freq="M")
+end_period = pd.Period(end_month, freq="M")
+
+if start_period > end_period:
+    st.warning("开始月份不能晚于结束月份")
+    st.stop()
+
 work = df[
-    (df["month_date"].dt.date >= start_date)
-    & (df["month_date"].dt.date <= end_date)
+    (df["month_period"] >= start_period) &
+    (df["month_period"] <= end_period)
 ].copy()
 
 if work.empty:
