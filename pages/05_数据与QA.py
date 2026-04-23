@@ -21,21 +21,36 @@ if not show_empty(qa, "qa_report.csv 为空"):
     })
     st.dataframe(qa_zh, use_container_width=True, hide_index=True, column_config=make_brand_table_config(list(qa_zh.columns)))
 
-section_header("映射覆盖率")
+section_header("映射与窗口活跃率", "说明：源表映射率=产品ASIN是否能在销售源中找到；窗口内激活率=最近统计窗口内是否有有效销量或销售额。")
+
 if not show_empty(coverage, "mapping_coverage.csv 为空"):
     coverage_zh = coverage.rename(columns={
         "segment_raw": "原型号段",
         "product_asin_count": "产品ASIN数",
-        "source_mapped_asin_count": "源表映射成功ASIN数",
-        "active_asin_count": "窗口内激活ASIN数",
-        "source_mapping_rate": "源表映射率",
-        "active_window_rate": "窗口内激活率",
+        "source_mapped_asin_count": "销售源已匹配ASIN数",
+        "active_asin_count": "窗口内活跃ASIN数",
+        "source_mapping_rate": "销售源匹配率(%)",
+        "active_window_rate": "窗口内活跃率(%)",
     }).copy()
-    if "源表映射率" in coverage_zh.columns:
-        coverage_zh["源表映射率"] = coverage_zh["源表映射率"] * 100
-    if "窗口内激活率" in coverage_zh.columns:
-        coverage_zh["窗口内激活率"] = coverage_zh["窗口内激活率"] * 100
-    st.dataframe(coverage_zh, use_container_width=True, hide_index=True, column_config=make_brand_table_config(list(coverage_zh.columns)))
+
+    if "销售源匹配率(%)" in coverage_zh.columns:
+        coverage_zh["销售源匹配率(%)"] = coverage_zh["销售源匹配率(%)"] * 100
+    if "窗口内活跃率(%)" in coverage_zh.columns:
+        coverage_zh["窗口内活跃率(%)"] = coverage_zh["窗口内活跃率(%)"] * 100
+
+    st.info(
+        "解读口径：\n"
+        "1. 销售源已匹配ASIN数：表示产品表里的 ASIN 能在销售源中找到。\n"
+        "2. 窗口内活跃ASIN数：表示最近统计窗口内有正销量或正销售额。\n"
+        "3. 若匹配率高但活跃率低，通常说明产品存在于销售源，但最近窗口内没有销售表现。"
+    )
+
+    st.dataframe(
+        coverage_zh,
+        use_container_width=True,
+        hide_index=True,
+        column_config=make_brand_table_config(list(coverage_zh.columns))
+    )
 
 section_header("窗口内未激活 ASIN")
 if not show_empty(inactive, "inactive_asin_in_window.csv 为空"):
