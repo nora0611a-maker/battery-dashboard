@@ -17,6 +17,7 @@ if show_empty(df, "agg_market_month.csv 为空"):
 df = df.copy()
 df["month_date"] = pd.to_datetime(df["month"].astype(str) + "-01", errors="coerce")
 df["month_period"] = pd.to_datetime(df["month"].astype(str), format="%Y-%m", errors="coerce").dt.to_period("M")
+df["year"] = df["month_date"].dt.year
 df = df.sort_values("month_date")
 
 month_options = (
@@ -33,7 +34,7 @@ with title_col:
     st.title("01 市场总览")
 with filter_col:
     st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
-    c_start, c_end = st.columns(2)
+    c_start, c_end, c_grain = st.columns([1, 1, 0.8])
     with c_start:
         start_month = st.selectbox(
             "开始月份",
@@ -47,6 +48,13 @@ with filter_col:
             month_options,
             index=len(month_options) - 1,
             key="home_end_month",
+        )
+    with c_grain:
+        grain = st.selectbox(
+            "维度",
+            ["月", "年"],
+            index=0,
+            key="home_grain",
         )
 
 start_period = pd.Period(start_month, freq="M")
@@ -79,20 +87,43 @@ with c3:
 
 st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
 
-section_header("月销量与销售额趋势")
-st.plotly_chart(market_combo_chart(work), use_container_width=True)
+# ===== 图表口径切换：月 / 年 =====
+if grain == "月":
+    chart_work = work.copy().sort_values("month_date")
+    chart_work["label"] = chart_work["month"].astype(str)
+    trend_title = "月销量与销售额趋势"
+    asp_title = "月 ASP 趋势"
+    latest_label_name = "最新月份"
+else:
+    chart_work = (
+        work.groupby("year", as_index=False)
+        .agg(
+            units=("units", "sum"),
+            revenue=("revenue", "sum"),
+        )
+        .sort_values("year")
+    )
+    chart_work["asp"] = chart_work["revenue"] / chart_work["units"]
+    chart_work["month_date"] = pd.to_datetime(chart_work["year"].astype(str) + "-01-01", errors="coerce")
+    chart_work["label"] = chart_work["year"].astype(str)
+    trend_title = "年销量与销售额趋势"
+    asp_title = "年 ASP 趋势"
+    latest_label_name = "最新年份"
 
-section_header("月 ASP 趋势")
+section_header(trend_title)
+st.plotly_chart(market_combo_chart(chart_work), use_container_width=True)
+
+section_header(asp_title)
 c4, c5 = st.columns([3, 1], gap="medium")
 with c4:
-    st.plotly_chart(asp_line_chart(work), use_container_width=True)
+    st.plotly_chart(asp_line_chart(chart_work), use_container_width=True)
 
 with c5:
-    latest = work.sort_values("month_date").iloc[-1]
-    prev = work.sort_values("month_date").iloc[-2] if len(work) >= 2 else None
+    latest = chart_work.sort_values("month_date").iloc[-1]
+    prev = chart_work.sort_values("month_date").iloc[-2] if len(chart_work) >= 2 else None
 
     st.markdown("#### 区间摘要")
-    st.markdown(f"**最新月份：** {latest['month']}")
+    st.markdown(f"**{latest_label_name}：** {latest['label']}")
     st.markdown(f"**销量：** {fmt_int(latest['units'])}")
     st.markdown(f"**销售额：** {fmt_money(latest['revenue'])}")
     st.markdown(f"**ASP：** {fmt_money(latest['asp'])}")
