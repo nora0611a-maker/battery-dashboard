@@ -6,7 +6,6 @@ from utils.charts import market_combo_chart, asp_line_chart
 from utils.styles import section_header, kpi_card, insight_card, apply_global_styles
 
 apply_global_styles()
-# st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 
 df = load_csv("agg_market_month")
 insight = load_text("insight_home")
@@ -83,27 +82,38 @@ section_header("月销量与销售额趋势")
 st.plotly_chart(market_combo_chart(work), use_container_width=True)
 
 section_header("月 ASP 趋势")
-c4, c5 = st.columns([3, 1], gap="medium")
+c4, c5 = st.columns([2.3, 1], gap="medium")
 with c4:
     st.plotly_chart(asp_line_chart(work), use_container_width=True)
 
 with c5:
-    latest = work.sort_values("month_date").iloc[-1]
-    prev = work.sort_values("month_date").iloc[-2] if len(work) >= 2 else None
+    work_sorted = work.sort_values("month_date").copy()
+    latest = work_sorted.iloc[-1]
+    prev = work_sorted.iloc[-2] if len(work_sorted) >= 2 else None
+
+    peak_revenue_row = work_sorted.loc[work_sorted["revenue"].idxmax()] if not work_sorted.empty else None
+    peak_units_row = work_sorted.loc[work_sorted["units"].idxmax()] if not work_sorted.empty else None
+    low_revenue_row = work_sorted.loc[work_sorted["revenue"].idxmin()] if not work_sorted.empty else None
 
     st.markdown("#### 区间摘要")
     st.markdown(f"**最新月份：** {latest['month']}")
-    st.markdown(f"**销量：** {fmt_int(latest['units'])}")
-    st.markdown(f"**销售额：** {fmt_money(latest['revenue'])}")
     st.markdown(f"**ASP：** {fmt_money(latest['asp'])}")
+    st.markdown(f"**销量：** {fmt_int(latest['units'])} ｜ **销售额：** {fmt_money(latest['revenue'])}")
+
 
     if prev is not None:
         units_chg = (latest["units"] / prev["units"] - 1) * 100 if prev["units"] > 0 else None
         rev_chg = (latest["revenue"] / prev["revenue"] - 1) * 100 if prev["revenue"] > 0 else None
-        if units_chg is not None:
-            st.markdown(f"**销量环比：** {units_chg:+.1f}%")
-        if rev_chg is not None:
-            st.markdown(f"**销售额环比：** {rev_chg:+.1f}%")
+        if units_chg is not None and rev_chg is not None:
+            st.markdown(f"**销量环比：** {units_chg:+.1f}% ｜ **销售额环比：** {rev_chg:+.1f}%")
+
+    # st.markdown("---")
+    if peak_revenue_row is not None:
+        st.markdown(f"**区间销售额峰值：** {peak_revenue_row['month']} ｜ {fmt_money(peak_revenue_row['revenue'])}")
+    if peak_units_row is not None:
+        st.markdown(f"**区间销量峰值：** {peak_units_row['month']} ｜ {fmt_int(peak_units_row['units'])}")
+    if low_revenue_row is not None:
+        st.markdown(f"**区间销售额低点：** {low_revenue_row['month']} ｜ {fmt_money(low_revenue_row['revenue'])}")
 
 section_header("数据解读")
 insight_card(insight)

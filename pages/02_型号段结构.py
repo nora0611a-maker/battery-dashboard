@@ -7,7 +7,6 @@ from utils.styles import section_header, insight_card, kpi_card
 from utils.styles import apply_global_styles
 
 apply_global_styles()
-# st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 
 trend_df = load_csv("agg_segment_month")
 insight = load_text("insight_segment")
@@ -30,14 +29,11 @@ month_options = (
 )
 
 st.title("02 型号段结构")
-
 st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
 
 c1, c2, c3 = st.columns(3)
-start_month = c1.selectbox("开始月份",month_options,index=0,key="segment_start_month")
-end_month = c2.selectbox("结束月份",month_options,index=len(month_options) - 1,key="segment_end_month")
-segment_options = ["全部"] + sorted([x for x in work_all["segment"].dropna().unique().tolist()])
-selected_segment = c3.selectbox("选择型号段", segment_options)
+start_month = c1.selectbox("开始月份", month_options, index=0, key="segment_start_month")
+end_month = c2.selectbox("结束月份", month_options, index=len(month_options) - 1, key="segment_end_month")
 
 start_period = pd.Period(start_month, freq="M")
 end_period = pd.Period(end_month, freq="M")
@@ -54,6 +50,9 @@ work_all = work_all[
 if work_all.empty:
     st.warning("当前筛选范围内暂无数据")
     st.stop()
+
+segment_options = ["全部"] + sorted([x for x in work_all["segment"].dropna().unique().tolist()])
+selected_segment = c3.selectbox("选择型号段", segment_options)
 
 work = work_all.copy()
 if selected_segment != "全部":
@@ -102,7 +101,7 @@ st.plotly_chart(segment_trend_chart(work, "units", ""), use_container_width=True
 section_header("型号段月销售额趋势")
 st.plotly_chart(segment_trend_chart(work, "revenue", ""), use_container_width=True)
 
-c6, c7 = st.columns([1.4, 1])
+c6, c7 = st.columns([1.5, 1],gap="medium")
 with c6:
     section_header("型号段汇总表", "看不同型号段的 ASP 与市占率分布情况")
 
@@ -146,10 +145,18 @@ with c6:
 
 with c7:
     if not summary_work.empty:
-        st.plotly_chart(
-            bar_top_n(summary_work, "segment", "asp", "高 ASP 型号段", n=min(10, len(summary_work)), height=420),
-            use_container_width=True,
-        )
+        if selected_segment == "全部":
+            st.plotly_chart(
+                bar_top_n(summary_work, "segment", "asp", "高 ASP 型号段", n=min(10, len(summary_work)), height=420),
+                use_container_width=True,
+            )
+        else:
+            seg_row = summary_work.iloc[0]
+            st.markdown("#### 当前型号段摘要")
+            st.markdown(f"**型号段：** {seg_row['segment']}")
+            st.markdown(f"**ASP：** ${seg_row['asp']:,.2f}")
+            st.markdown(f"**销量：** {int(seg_row['units']):,} ｜ **销售额：** ${seg_row['revenue']:,.2f}")
+            st.markdown(f"**销量份额：** {seg_row['share_units_pct']:.2f}% ｜ **销售额份额：** {seg_row['share_revenue_pct']:.2f}%")
 
 st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 section_header("数据解读")

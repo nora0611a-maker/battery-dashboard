@@ -93,14 +93,14 @@ month_options = (
 st.title("04 ASIN运营监控")
 st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 
-# ===== 品牌/型号联动 =====
-brand_options = ["全部"] + sorted([x for x in asin_month["brand"].dropna().unique().tolist()])
-
 c1, c2, c3, c4 = st.columns([1, 1, 1, 0.8])
 selected_month = c1.selectbox("选择月份", month_options, index=len(month_options) - 1 if month_options else 0)
+
+brand_base = asin_month[asin_month["month"] == selected_month].copy()
+brand_options = ["全部"] + sorted([x for x in brand_base["brand"].dropna().unique().tolist()])
 selected_brand = c2.selectbox("选择品牌", brand_options)
 
-segment_base = asin_month[asin_month["month"] == selected_month].copy()
+segment_base = brand_base.copy()
 if selected_brand != "全部":
     segment_base = segment_base[segment_base["brand"] == selected_brand].copy()
 
@@ -140,27 +140,37 @@ for col in ["市场", "月份", "ASIN", "品牌", "型号段", "标题", "链接
 for col in ["当月销量", "当月销售额", "ASP", "评分", "评分数"]:
     month_zh[col] = pd.to_numeric(month_zh[col], errors="coerce")
 
-section_header("头部 ASIN", "优先看所选月份下的全市场和分型号段头部 ASIN。")
+section_header("头部 ASIN", "优先看所选月份下的当前筛选口径头部 ASIN。")
 
 c5, c6 = st.columns(2)
 with c5:
-    st.markdown("##### 当月全市场 Top ASIN")
+    st.markdown("##### 当前口径 Top ASIN")
     top_total = month_zh.sort_values("当月销售额", ascending=False).head(top_n).copy()
     show_df(top_total, ["市场", "月份", "品牌", "ASIN", "链接", "当月销量", "当月销售额", "ASP"])
 
 with c6:
-    st.markdown("##### 当月分型号段 Top ASIN")
+    st.markdown("##### 当前口径分型号段 Top ASIN")
     top_segment = month_zh.sort_values(["型号段", "当月销售额"], ascending=[True, False]).copy()
+
     if selected_segment == "全部":
-        top_segment = top_segment.groupby("型号段", group_keys=False).head(min(10, top_n))
+        top_segment = (
+            top_segment.groupby("型号段", group_keys=False)
+            .head(top_n)
+            .sort_values("当月销售额", ascending=False)
+            .head(top_n)
+            .copy()
+        )
     else:
         top_segment = top_segment.head(top_n)
+
     if top_segment.empty:
         st.info("暂无分型号段数据")
     else:
         show_df(top_segment, ["市场", "月份", "型号段", "品牌", "ASIN", "链接", "当月销量", "当月销售额", "ASP"])
 
-section_header("新品与上新", "看当前月份新品质量与品牌上新效果。")
+
+st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+section_header("新品与上新（仅最新月）", "看最新月份新品质量与品牌上新效果。")
 
 c7, c8 = st.columns([2, 1])
 with c7:
@@ -204,7 +214,9 @@ with c7:
         )
 
 with c8:
-    if not brand_new.empty and selected_month == (month_options[-1] if month_options else selected_month):
+    if selected_segment != "全部":
+        st.info("品牌上新表现当前仅支持全型号段口径，请切换到“全部”查看。")
+    elif not brand_new.empty and selected_month == (month_options[-1] if month_options else selected_month):
         brand_new_work = brand_new.copy()
         if selected_brand != "全部":
             brand_new_work = brand_new_work[brand_new_work["brand"] == selected_brand].copy()
@@ -216,14 +228,15 @@ with c8:
                 "品牌上新表现",
                 n=min(10, len(brand_new_work)),
                 horizontal=True,
-                height=380,
+                height=320,
             ),
             use_container_width=True,
         )
     else:
         st.info("品牌上新表现当前仅展示最新月结果")
 
-section_header("ASIN 异动榜", "识别所选月份相较上月增长最快的 ASIN。")
+st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+section_header("ASIN 异动榜（仅最新月）", "识别最新月份相较上月增长最快的 ASIN。")
 
 growth_work = asin_growth.copy()
 if not growth_work.empty:
@@ -267,17 +280,18 @@ else:
         ["市场", "型号段", "品牌", "ASIN", "链接", "当月", "上月", "当月销售额", "销售额增长率(%)", "销量增长率(%)"]
     )
 
+st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 section_header("累计视角补充", "用于复盘整个窗口周期内的累计表现。")
+
+download_total_work = asin_total.copy()
+if selected_brand != "全部":
+    download_total_work = download_total_work[download_total_work["brand"] == selected_brand].copy()
+if selected_segment != "全部":
+    download_total_work = download_total_work[download_total_work["segment"] == selected_segment].copy()
 
 ct1, ct2 = st.columns(2)
 with ct1:
-    total_work = asin_total.copy()
-    if selected_brand != "全部":
-        total_work = total_work[total_work["brand"] == selected_brand].copy()
-    if selected_segment != "全部":
-        total_work = total_work[total_work["segment"] == selected_segment].copy()
-
-    total_zh = rename_for_display(total_work, {
+    total_zh = rename_for_display(download_total_work, {
         "market": "市场",
         "asin": "ASIN",
         "brand": "品牌",
@@ -295,8 +309,11 @@ with ct1:
     for col in ["累计销量", "累计销售额", "ASP"]:
         total_zh[col] = pd.to_numeric(total_zh[col], errors="coerce")
 
-    st.markdown("##### 全周期累计 Top ASIN")
-    show_df(total_zh.sort_values("累计销售额", ascending=False).head(top_n).copy(), ["市场", "品牌", "ASIN", "链接", "累计销量", "累计销售额", "ASP"])
+    st.markdown("##### 当前口径累计 Top ASIN")
+    show_df(
+        total_zh.sort_values("累计销售额", ascending=False).head(top_n).copy(),
+        ["市场", "品牌", "ASIN", "链接", "累计销量", "累计销售额", "ASP"]
+    )
 
 with ct2:
     seg_total_work = asin_segment_total.copy()
@@ -323,12 +340,25 @@ with ct2:
     for col in ["累计销量", "累计销售额", "ASP"]:
         seg_total_zh[col] = pd.to_numeric(seg_total_zh[col], errors="coerce")
 
-    st.markdown("##### 分型号段累计 Top ASIN")
+    st.markdown("##### 当前口径分型号段累计 Top ASIN")
     if seg_total_zh.empty:
         st.info("暂无分型号段累计数据")
     else:
+        if selected_segment == "全部":
+            # 你要求的是：全局最强的分型号段头部
+            seg_total_zh_show = (
+                seg_total_zh.sort_values(["型号段", "累计销售额"], ascending=[True, False])
+                .groupby("型号段", group_keys=False)
+                .head(top_n)
+                .sort_values("累计销售额", ascending=False)
+                .head(top_n)
+                .copy()
+            )
+        else:
+            seg_total_zh_show = seg_total_zh.sort_values("累计销售额", ascending=False).head(top_n).copy()
+
         show_df(
-            seg_total_zh.sort_values(["型号段", "累计销售额"], ascending=[True, False]).head(top_n).copy(),
+            seg_total_zh_show,
             ["市场", "型号段", "品牌", "ASIN", "链接", "累计销量", "累计销售额", "ASP"]
         )
 
@@ -337,7 +367,7 @@ with c_dl1:
     add_download_button(month_work, f"agg_asin_month_{selected_month}.csv", "下载当月 ASIN 明细")
 
 with c_dl2:
-    add_download_button(asin_total, "agg_asin_market_total.csv", "下载累计 ASIN 总表")
+    add_download_button(download_total_work, "agg_asin_market_total_filtered.csv", "下载累计 ASIN 总表")
 
 st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 section_header("数据解读")

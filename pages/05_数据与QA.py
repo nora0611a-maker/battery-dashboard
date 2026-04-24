@@ -19,7 +19,12 @@ if not show_empty(qa, "qa_report.csv 为空"):
         "check_value": "检查值",
         "status": "状态",
     })
-    st.dataframe(qa_zh, use_container_width=True, hide_index=True, column_config=make_brand_table_config(list(qa_zh.columns)))
+    st.dataframe(
+        qa_zh,
+        use_container_width=True,
+        hide_index=True,
+        column_config=make_brand_table_config(list(qa_zh.columns))
+    )
 
 section_header("映射与窗口活跃率", "说明：源表映射率=产品ASIN是否能在销售源中找到；窗口内激活率=最近统计窗口内是否有有效销量或销售额。")
 
@@ -64,6 +69,21 @@ if not show_empty(inactive, "inactive_asin_in_window.csv 为空"):
         "detail_url": "链接",
         "reason": "原因",
     })
+
+    inactive_filter_col1, inactive_filter_col2 = st.columns([1, 3])
+    with inactive_filter_col1:
+        segment_options = ["全部"] + sorted([x for x in inactive_zh["原型号段"].dropna().unique().tolist()])
+        selected_inactive_segment = st.selectbox("按原型号段筛选", segment_options, key="qa_inactive_segment")
+
+    if selected_inactive_segment != "全部":
+        inactive_zh = inactive_zh[inactive_zh["原型号段"] == selected_inactive_segment].copy()
+
     show_cols = ["原型号段", "品牌", "ASIN", "型号", "SKU", "标题", "链接", "原因"]
     show_cols = [c for c in show_cols if c in inactive_zh.columns]
-    st.dataframe(inactive_zh[show_cols], use_container_width=True, hide_index=True, column_config=make_brand_table_config(show_cols))
+
+    st.dataframe(
+        inactive_zh[show_cols],
+        use_container_width=True,
+        hide_index=True,
+        column_config=make_brand_table_config(show_cols)
+    )
